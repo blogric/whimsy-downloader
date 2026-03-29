@@ -26,44 +26,53 @@ async def home(request: Request):
 async def download_videos(text: str = Form(...)):
     links = extract_rednote_links(text)
     if not links:
-        return {"error": "Koi valid xhslink.com link nahi mila"}
+        return {"error": "Koi valid xhslink.com link nahi mila. Sirf http://xhslink.com wale links paste karo."}
 
     with tempfile.TemporaryDirectory() as tmpdirname:
         ydl_opts = {
             'format': 'bestvideo[ext=mp4]+bestaudio/best',
             'outtmpl': f'{tmpdirname}/%(title)s.%(ext)s',
             'merge_output_format': 'mp4',
-            'quiet': True,
-            'no_warnings': True,
+            'quiet': False,           # logging on kar diya
+            'no_warnings': False,
             'noplaylist': True,
             'http_headers': {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36',
                 'Referer': 'https://www.xiaohongshu.com/',
+                'Accept-Language': 'zh-CN,zh;q=0.9',
             }
         }
 
         downloaded_files = []
+        errors = []
+
         for url in links:
             try:
+                print(f"Downloading: {url}")
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     info = ydl.extract_info(url, download=True)
                     if info:
-                        # Downloaded file ka naam nikaalo
                         for entry in info.get('requested_downloads', []):
-                            if os.path.exists(entry.get('filepath', '')):
-                                downloaded_files.append(os.path.basename(entry['filepath']))
+                            filepath = entry.get('filepath')
+                            if filepath and os.path.exists(filepath):
+                                downloaded_files.append(os.path.basename(filepath))
+                                print(f"Success: {os.path.basename(filepath)}")
             except Exception as e:
-                print(f"Download failed for {url}: {str(e)[:150]}")
+                err_msg = str(e)[:200]
+                errors.append(f"{url}: {err_msg}")
+                print(f"Failed {url}: {err_msg}")
 
         if not downloaded_files:
-            return {"error": "Koi bhi video download nahi ho saka. RedNote blocking kar raha hai ya links expired hain."}
+            error_text = "Koi video download nahi ho saka.\n\n" + "\n".join(errors[:3])
+            if "Unable to extract" in error_text or "generic" in error_text.lower():
+                error_text += "\n\nRedNote (xhslink) currently blocks yt-dlp. Manual browser method ya dedicated downloader use karo."
+            return {"error": error_text}
 
-        # ZIP file banao
+        # ZIP banao
         zip_buffer = BytesIO()
         with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
             for fname in downloaded_files:
-                filepath = os.path.join(tmpdirname, fname)
-                zf.write(filepath, fname)
+                zf.write(os.path.join(tmpdirname, fname), fname)
         
         zip_buffer.seek(0)
         return FileResponse(

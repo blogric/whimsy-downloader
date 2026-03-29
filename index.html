@@ -1,37 +1,36 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Bulk RedNote Downloader</title>
+<title>Ultimate Downloader</title>
 </head>
 <body>
 
 <h2>Bulk Video Downloader</h2>
 
-<textarea id="links" rows="10" cols="60" placeholder="Paste multiple links (one per line)"></textarea><br><br>
-
-<button onclick="start()">Download</button>
+<textarea id="links" rows="10" cols="60"></textarea><br>
+<button onclick="start()">Start</button>
 
 <div id="output"></div>
 
 <script>
-async function start() {
+async function start(){
     let raw = document.getElementById("links").value;
-    let links = raw.split("\n").filter(l => l.trim() !== "");
+    let links = raw.split("\n").filter(x=>x.trim()!="");
 
-    let res = await fetch("/bulk", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({links})
+    let res = await fetch("/bulk",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({links})
     });
 
     let data = await res.json();
-
     let html = "";
-    data.forEach(item => {
-        if(item.video !== "Not Found"){
-            html += `<p>${item.link} → <a href="${item.video}" target="_blank">Download</a></p>`;
+
+    data.forEach(d=>{
+        if(d.video && d.video !== "Failed"){
+            html += `<p><a href="${d.video}" target="_blank">Download</a></p>`;
         } else {
-            html += `<p>${item.link} → Failed</p>`;
+            html += `<p>Failed</p>`;
         }
     });
 

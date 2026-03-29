@@ -1,33 +1,35 @@
-from flask import Flask, request, jsonify, send_file
-import requests
-from bs4 import BeautifulSoup
+from flask import Flask, request, jsonify
+from playwright.sync_api import sync_playwright
 import os
 
 app = Flask(__name__)
 
-def extract_video(url):
+def get_video(url):
     try:
-        headers = {"User-Agent": "Mozilla/5.0"}
-        r = requests.get(url, headers=headers, allow_redirects=True)
-        final_url = r.url
+        with sync_playwright() as p:
+            browser = p.chromium.launch(
+                headless=True,
+                args=["--no-sandbox","--disable-dev-shm-usage"]
+            )
+            page = browser.new_page()
+            page.goto(url, timeout=60000)
+            page.wait_for_timeout(5000)
 
-        html = requests.get(final_url, headers=headers).text
-        soup = BeautifulSoup(html, "html.parser")
+            video = page.query_selector("video")
+            if video:
+                src = video.get_attribute("src")
+                browser.close()
+                return src
 
-        video = None
+            content = page.content()
+            browser.close()
 
-        # try video tag
-        tag = soup.find("video")
-        if tag and tag.get("src"):
-            video = tag.get("src")
+            import re
+            match = re.search(r'\"url\":\"(https:.*?\\.mp4)\"', content)
+            if match:
+                return match.group(1)
 
-        # fallback meta
-        if not video:
-            meta = soup.find("meta", property="og:video")
-            if meta:
-                video = meta.get("content")
-
-        return video
+        return None
     except:
         return None
 
@@ -44,11 +46,8 @@ def bulk():
     results = []
 
     for link in links:
-        video = extract_video(link)
-        results.append({
-            "link": link,
-            "video": video if video else "Not Found"
-        })
+        video = get_video(link)
+        results.append({"link": link, "video": video if video else "Failed"})
 
     return jsonify(results)
 

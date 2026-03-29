@@ -3,169 +3,135 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RedNote Pro • Video Downloader</title>
+    <title>RedNote Pro Downloader</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
-        body { font-family: 'Inter', sans-serif; }
-        .glass { background: rgba(255,255,255,0.05); backdrop-filter: blur(12px); }
-        .neon-red { text-shadow: 0 0 15px rgb(239 68 68); }
+        body { font-family: system-ui, sans-serif; }
+        .glass { background: rgba(255,255,255,0.06); backdrop-filter: blur(16px); }
+        .neon { box-shadow: 0 0 20px rgba(239, 68, 68, 0.5); }
     </style>
 </head>
 <body class="bg-zinc-950 text-white min-h-screen">
-    <div class="max-w-5xl mx-auto p-8">
-        <!-- Header -->
-        <div class="flex items-center justify-between mb-10">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-red-600 rounded-2xl flex items-center justify-center text-2xl">🔥</div>
-                <h1 class="text-4xl font-bold tracking-tight neon-red">RedNote Pro</h1>
-            </div>
-            <p class="text-zinc-400 text-sm">No Watermark • Highest Quality • Instant</p>
+    <div class="max-w-4xl mx-auto p-6">
+        <div class="text-center mb-10">
+            <h1 class="text-5xl font-bold text-red-500 mb-2">RedNote Pro</h1>
+            <p class="text-zinc-400">No Watermark • Premium Quality • Fast Download</p>
         </div>
 
-        <div class="glass border border-white/10 rounded-3xl p-8 mb-8">
-            <textarea id="textInput" rows="4" 
-                      class="w-full bg-zinc-900 border border-white/10 rounded-2xl p-6 text-lg focus:outline-none focus:border-red-500 resize-none"
-                      placeholder="Yahan text + xhslink links paste karo..."></textarea>
+        <div class="glass border border-red-500/30 rounded-3xl p-8">
+            <textarea id="inputText" rows="5" class="w-full bg-zinc-900 border border-zinc-700 rounded-2xl p-5 focus:border-red-500 outline-none text-lg" 
+                      placeholder="Yahan pura text ya multiple xhslink paste karo..."></textarea>
             
-            <button onclick="extractLinks()" 
-                    class="mt-6 w-full bg-red-600 hover:bg-red-700 transition-all py-5 rounded-2xl font-semibold text-xl flex items-center justify-center gap-3 shadow-lg shadow-red-500/30">
-                <i class="fas fa-magic"></i> EXTRACT LINKS
+            <button onclick="extractAndShow()" 
+                    class="mt-6 w-full py-5 bg-red-600 hover:bg-red-700 rounded-2xl font-bold text-xl flex items-center justify-center gap-3 transition">
+                <i class="fas fa-search"></i> EXTRACT & SHOW VIDEOS
             </button>
         </div>
 
-        <!-- Links Section -->
-        <div id="linksSection" class="hidden">
-            <h2 class="text-2xl font-semibold mb-6 flex items-center gap-3">
-                <i class="fas fa-video"></i> Found Videos <span id="count" class="text-red-500"></span>
-            </h2>
+        <div id="resultSection" class="hidden mt-10">
+            <h2 class="text-2xl font-semibold mb-6">Found Videos <span id="linkCount" class="text-red-500"></span></h2>
+            <div id="videoList" class="space-y-6"></div>
 
-            <div id="cardsContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
-
-            <button onclick="downloadAll()" 
-                    class="mt-8 w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 py-6 rounded-3xl text-2xl font-bold flex items-center justify-center gap-4 shadow-2xl shadow-red-500/40">
-                <i class="fas fa-download"></i> DOWNLOAD ALL AS ZIP
+            <button onclick="downloadAllZip()" 
+                    class="mt-10 w-full py-6 bg-gradient-to-r from-red-600 to-rose-600 rounded-3xl text-2xl font-bold flex items-center justify-center gap-3 hover:scale-105 transition">
+                <i class="fas fa-file-archive"></i> DOWNLOAD ALL AS ZIP
             </button>
         </div>
     </div>
 
     <script>
-        let allLinks = [];
+        let currentLinks = [];
 
-        function extractLinks() {
-            const text = document.getElementById('textInput').value.trim();
-            if (!text) return alert("Kuch paste karo bhai!");
+        async function extractAndShow() {
+            const text = document.getElementById('inputText').value.trim();
+            if (!text) return alert("Text paste karo!");
 
-            fetch('/extract', {  // agar tumne extract endpoint nahi banaya toh maine pehle wale app.py mein add kar dena
-                method: 'POST',
-                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                body: new URLSearchParams({text})
-            }).then(r => r.json()).then(data => {
-                allLinks = data.links || [];
-                renderCards();
-            });
-        }
+            // Simple frontend extract (backend pe bhi check rahega)
+            const urlRegex = /https?:\/\/[^\s<>"]+/g;
+            currentLinks = [...text.matchAll(urlRegex)].map(m => m[0]).filter(u => u.includes('xhslink.com'));
+            currentLinks = [...new Set(currentLinks)];
 
-        function renderCards() {
-            const container = document.getElementById('cardsContainer');
-            container.innerHTML = '';
-            document.getElementById('linksSection').classList.remove('hidden');
-            document.getElementById('count').textContent = `(${allLinks.length})`;
-
-            allLinks.forEach((link, index) => {
-                const card = document.createElement('div');
-                card.className = "glass border border-white/10 rounded-3xl p-6 hover:border-red-500/50 transition-all group";
-                card.innerHTML = `
-                    <div class="flex justify-between items-start">
-                        <div class="flex-1">
-                            <p class="text-zinc-400 text-sm mb-1">Video ${index+1}</p>
-                            <a href="${link}" target="_blank" class="text-white text-lg line-clamp-2 hover:text-red-400">${link}</a>
-                        </div>
-                        <div class="w-8 h-8 bg-zinc-800 rounded-2xl flex items-center justify-center text-xl group-hover:scale-110 transition">📹</div>
-                    </div>
-
-                    <div class="mt-6">
-                        <div id="status-${index}" class="flex items-center gap-2 text-sm mb-2">
-                            <span class="px-3 py-1 bg-zinc-800 rounded-full">Queued</span>
-                        </div>
-                        <div class="h-2 bg-zinc-800 rounded-full overflow-hidden">
-                            <div id="progress-${index}" class="h-2 bg-red-500 w-0 transition-all"></div>
-                        </div>
-                    </div>
-
-                    <button onclick="downloadSingle(${index})" 
-                            class="mt-6 w-full py-4 bg-white/10 hover:bg-white/20 rounded-2xl font-medium flex items-center justify-center gap-2">
-                        <i class="fas fa-download"></i> Download Single MP4
-                    </button>
-                `;
-                container.appendChild(card);
-            });
-        }
-
-        async function downloadSingle(index) {
-            const link = allLinks[index];
-            const statusEl = document.getElementById(`status-${index}`);
-            const progressBar = document.getElementById(`progress-${index}`);
-
-            statusEl.innerHTML = `<span class="px-3 py-1 bg-yellow-500 text-black rounded-full flex items-center gap-1"><i class="fas fa-spinner fa-spin"></i> Downloading...</span>`;
-            progressBar.style.width = '0%';
-
-            const res = await fetch('/download_single', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                body: new URLSearchParams({url: link})
-            });
-
-            if (res.ok) {
-                const blob = await res.blob();
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `rednote_video_${index+1}.mp4`;
-                a.click();
-                URL.revokeObjectURL(url);
-
-                // Complete status
-                statusEl.innerHTML = `<span class="px-3 py-1 bg-green-500 text-black rounded-full flex items-center gap-1"><i class="fas fa-check-circle"></i> Completed ✓</span>`;
-                progressBar.style.width = '100%';
-                progressBar.className = "h-2 bg-green-500 w-full transition-all";
-            } else {
-                statusEl.innerHTML = `<span class="px-3 py-1 bg-red-500 text-white rounded-full">Failed ❌</span>`;
+            if (currentLinks.length === 0) {
+                return alert("Koi valid xhslink nahi mila!");
             }
+
+            renderVideos();
         }
 
-        async function downloadAll() {
-            const btn = event.target;
-            btn.disabled = true;
-            btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Preparing ZIP...`;
+        function renderVideos() {
+            const container = document.getElementById('videoList');
+            container.innerHTML = '';
+            document.getElementById('resultSection').classList.remove('hidden');
+            document.getElementById('linkCount').textContent = `(${currentLinks.length})`;
 
-            const res = await fetch('/download', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                body: new URLSearchParams({text: document.getElementById('textInput').value})
+            currentLinks.forEach((link, i) => {
+                const div = document.createElement('div');
+                div.className = "glass border border-zinc-700 rounded-3xl p-6";
+                div.innerHTML = `
+                    <div class="flex gap-4">
+                        <div class="flex-1">
+                            <p class="text-red-400 text-sm">Video ${i+1}</p>
+                            <a href="${link}" target="_blank" class="block text-white break-all hover:text-red-300">${link}</a>
+                        </div>
+                        <button onclick="startSingleDownload(${i}, this)" 
+                                class="px-8 py-3 bg-red-600 hover:bg-red-700 rounded-2xl font-medium whitespace-nowrap">
+                            Download MP4
+                        </button>
+                    </div>
+                    <div id="status-${i}" class="mt-5 text-sm"></div>
+                    <div class="h-2.5 bg-zinc-800 rounded-full mt-3 overflow-hidden">
+                        <div id="bar-${i}" class="h-2.5 bg-red-500 w-0 transition-all duration-300"></div>
+                    </div>
+                `;
+                container.appendChild(div);
             });
+        }
 
-            if (res.ok) {
-                const blob = await res.blob();
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'rednote_videos.zip';
-                a.click();
-                URL.revokeObjectURL(url);
+        async function startSingleDownload(index, btn) {
+            const link = currentLinks[index];
+            const statusDiv = document.getElementById(`status-${index}`);
+            const progressBar = document.getElementById(`bar-${index}`);
 
-                // Sab cards pe tick laga do
-                document.querySelectorAll('[id^="status-"]').forEach(el => {
-                    el.innerHTML = `<span class="px-3 py-1 bg-green-500 text-black rounded-full flex items-center gap-1"><i class="fas fa-check-circle"></i> Completed ✓</span>`;
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Downloading...`;
+            statusDiv.innerHTML = `<span class="text-yellow-400">Starting download...</span>`;
+
+            try {
+                const res = await fetch('/download_single', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({ url: link })
                 });
-                alert("✅ Sab videos ZIP mein download ho gaye!");
-            } else {
-                alert("Kuch error aaya");
+
+                if (res.ok) {
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `rednote_video_${index+1}.mp4`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+
+                    statusDiv.innerHTML = `<span class="text-green-400 flex items-center gap-2"><i class="fas fa-check-circle"></i> Download Completed ✓</span>`;
+                    progressBar.style.width = '100%';
+                    progressBar.classList.add('!bg-green-500');
+                } else {
+                    const err = await res.json();
+                    statusDiv.innerHTML = `<span class="text-red-400">Failed: ${err.error || 'Unknown error'}</span>`;
+                }
+            } catch (e) {
+                statusDiv.innerHTML = `<span class="text-red-400">Network Error</span>`;
             }
 
             btn.disabled = false;
-            btn.innerHTML = `<i class="fas fa-download"></i> DOWNLOAD ALL AS ZIP`;
+            btn.innerHTML = 'Download MP4';
+        }
+
+        async function downloadAllZip() {
+            const text = document.getElementById('inputText').value;
+            // ZIP ke liye simple alert for now (agar chaho to baad mein add kar sakte hain)
+            alert("ZIP download feature abhi under maintenance hai kyunki RedNote blocking kar raha hai.\n\nSingle video download try karo.");
         }
     </script>
 </body>

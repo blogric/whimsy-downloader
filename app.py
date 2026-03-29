@@ -27,6 +27,34 @@ def cleanup_file(path, delay=600):
             pass
     threading.Thread(target=_delete, daemon=True).start()
 
+def normalize_xhs_url(url):
+    """
+    Convert any xiaohongshu/xhslink URL to the clean explore format
+    that yt-dlp supports: https://www.xiaohongshu.com/explore/<item_id>
+    """
+    # Extract item ID from various URL patterns:
+    # /discovery/item/<id>
+    # /explore/<id>
+    # /user/profile/<uid>/feeds/<id>
+    patterns = [
+        r'xiaohongshu\.com/discovery/item/([a-f0-9]+)',
+        r'xiaohongshu\.com/explore/([a-f0-9]+)',
+        r'xiaohongshu\.com/user/profile/[^/]+/feeds/([a-f0-9]+)',
+    ]
+    for pat in patterns:
+        m = re.search(pat, url)
+        if m:
+            item_id = m.group(1)
+            return f'https://www.xiaohongshu.com/explore/{item_id}'
+
+    # xhslink.com short URLs — return as-is, yt-dlp handles redirects
+    if 'xhslink.com' in url:
+        # Strip query params from short links
+        return url.split('?')[0]
+
+    # Fallback: strip query params and return
+    return url.split('?')[0]
+
 def extract_links(text):
     text = re.sub(r'(?<=[^\s])(https?://)', r'\n\1', text)
     clean = []
@@ -35,7 +63,7 @@ def extract_links(text):
         line = line.strip()
         m = pattern.match(line)
         if m:
-            url = m.group(1)
+            url = normalize_xhs_url(m.group(1))
             if url not in clean:
                 clean.append(url)
     return clean
@@ -70,6 +98,11 @@ def download_worker(job_id, links, quality):
             'socket_timeout': 30,
             'retries': 3,
             'noplaylist': True,
+            'http_headers': {
+                'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.43',
+                'Referer': 'https://www.xiaohongshu.com/',
+                'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+            },
         }
 
         try:

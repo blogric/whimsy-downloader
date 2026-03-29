@@ -35,8 +35,7 @@
             
             btn.disabled = true;
             btn.innerHTML = `Downloading... <span class="animate-pulse">⏳</span>`;
-            status.innerHTML = "Links extract ho rahe hain aur download shuru...";
-
+status.innerHTML = `<span class="text-yellow-400">Trying to download... (RedNote sometimes blocks direct download)</span>`;
             try {
                 const res = await fetch('/download', {
                     method: 'POST',

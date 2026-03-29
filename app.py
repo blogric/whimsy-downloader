@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request, Form
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 import re
 import yt_dlp
@@ -8,15 +8,14 @@ import tempfile
 import zipfile
 from io import BytesIO
 
-app = FastAPI(title="RedNote Direct Downloader")
+app = FastAPI(title="RedNote Downloader")
 templates = Jinja2Templates(directory="templates")
 
 def extract_rednote_links(text: str):
     url_pattern = r'https?://[^\s<>"]+'
     urls = re.findall(url_pattern, text)
-    # Sirf xhslink.com wale links
     rednote_urls = [u.strip() for u in urls if 'xhslink.com' in u.lower()]
-    return list(dict.fromkeys(rednote_urls))  # unique links
+    return list(dict.fromkeys(rednote_urls))
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
@@ -26,20 +25,19 @@ async def home(request: Request):
 async def download_videos(text: str = Form(...)):
     links = extract_rednote_links(text)
     if not links:
-        return {"error": "Koi valid xhslink.com link nahi mila. Sirf http://xhslink.com wale links paste karo."}
+        return {"error": "Koi valid xhslink.com link nahi mila"}
 
     with tempfile.TemporaryDirectory() as tmpdirname:
         ydl_opts = {
             'format': 'bestvideo[ext=mp4]+bestaudio/best',
             'outtmpl': f'{tmpdirname}/%(title)s.%(ext)s',
             'merge_output_format': 'mp4',
-            'quiet': False,           # logging on kar diya
+            'quiet': False,
             'no_warnings': False,
             'noplaylist': True,
             'http_headers': {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                 'Referer': 'https://www.xiaohongshu.com/',
-                'Accept-Language': 'zh-CN,zh;q=0.9',
             }
         }
 
@@ -48,25 +46,25 @@ async def download_videos(text: str = Form(...)):
 
         for url in links:
             try:
-                print(f"Downloading: {url}")
+                print(f"[+] Trying: {url}")
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     info = ydl.extract_info(url, download=True)
                     if info:
                         for entry in info.get('requested_downloads', []):
-                            filepath = entry.get('filepath')
-                            if filepath and os.path.exists(filepath):
-                                downloaded_files.append(os.path.basename(filepath))
-                                print(f"Success: {os.path.basename(filepath)}")
+                            fp = entry.get('filepath')
+                            if fp and os.path.exists(fp):
+                                downloaded_files.append(os.path.basename(fp))
+                                print(f"[✓] Downloaded: {os.path.basename(fp)}")
             except Exception as e:
-                err_msg = str(e)[:200]
-                errors.append(f"{url}: {err_msg}")
-                print(f"Failed {url}: {err_msg}")
+                err = str(e)[:300]
+                errors.append(f"{url}: {err}")
+                print(f"[-] Failed {url}: {err}")
 
         if not downloaded_files:
-            error_text = "Koi video download nahi ho saka.\n\n" + "\n".join(errors[:3])
-            if "Unable to extract" in error_text or "generic" in error_text.lower():
-                error_text += "\n\nRedNote (xhslink) currently blocks yt-dlp. Manual browser method ya dedicated downloader use karo."
-            return {"error": error_text}
+            error_msg = "Koi video download nahi ho saka.\n\n" + "\n".join(errors[:5])
+            if "Unable to extract" in error_msg or "generic" in error_msg.lower():
+                error_msg += "\n\nNote: RedNote (xhslink) currently has heavy blocking on yt-dlp. Direct download mushkil hai."
+            return {"error": error_msg}
 
         # ZIP banao
         zip_buffer = BytesIO()
@@ -75,8 +73,12 @@ async def download_videos(text: str = Form(...)):
                 zf.write(os.path.join(tmpdirname, fname), fname)
         
         zip_buffer.seek(0)
-        return FileResponse(
-            path=zip_buffer,
+        
+        # Fixed way to send BytesIO
+        return StreamingResponse(
+            zip_buffer,
             media_type="application/zip",
-            filename="rednote_videos.zip"
+            headers={
+                "Content-Disposition": "attachment; filename=rednote_videos.zip"
+            }
         )

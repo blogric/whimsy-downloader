@@ -1,94 +1,69 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ur">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RedNote Video Downloader</title>
+    <title>RedNote Direct Downloader</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
-<body class="bg-gray-950 text-white">
-    <div class="max-w-4xl mx-auto p-8">
-        <h1 class="text-4xl font-bold text-center mb-2">🔥 RedNote Video Downloader</h1>
-        <p class="text-center text-gray-400 mb-8">Paste any text with xhslink links → Get MP4 videos (No Watermark)</p>
+<body class="bg-zinc-950 text-white min-h-screen">
+    <div class="max-w-2xl mx-auto p-6">
+        <h1 class="text-3xl font-bold text-center mb-6">RedNote Video Downloader</h1>
+        <p class="text-center text-zinc-400 mb-8">Paste text with xhslink → Direct MP4 Download (ZIP)</p>
 
-        <form id="extractForm" class="bg-gray-900 rounded-2xl p-6 mb-8">
-            <textarea id="textInput" rows="6" class="w-full bg-black border border-gray-700 rounded-xl p-4 text-white focus:outline-none focus:border-red-500" placeholder="Yahan paste karo text + links..."></textarea>
-            <button type="submit" class="mt-4 w-full bg-red-600 hover:bg-red-700 py-4 rounded-xl font-semibold flex items-center justify-center gap-2">
-                <i class="fas fa-magic"></i> Extract Valid Links
+        <form id="form" class="space-y-4">
+            <textarea id="text" rows="8" class="w-full bg-zinc-900 border border-zinc-700 rounded-2xl p-5 focus:outline-none focus:border-red-500" placeholder="Yahan text + links paste karo..."></textarea>
+            
+            <button type="submit" id="btn" 
+                    class="w-full bg-red-600 hover:bg-red-700 py-4 rounded-2xl font-bold text-lg flex items-center justify-center gap-2">
+                <span>Download All Videos</span>
             </button>
         </form>
 
-        <div id="linksSection" class="hidden bg-gray-900 rounded-2xl p-6">
-            <h2 class="text-xl font-semibold mb-4 flex items-center gap-2"><i class="fas fa-link"></i> Found Links</h2>
-            <div id="linksList" class="space-y-3"></div>
-            
-            <button onclick="downloadAll()" class="mt-6 w-full bg-green-600 hover:bg-green-700 py-4 rounded-xl font-semibold flex items-center justify-center gap-2">
-                <i class="fas fa-download"></i> Download All Videos as ZIP
-            </button>
-        </div>
+        <div id="status" class="mt-6 text-center text-sm"></div>
     </div>
 
     <script>
-        const form = document.getElementById('extractForm');
+        const form = document.getElementById('form');
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const text = document.getElementById('textInput').value.trim();
-            if (!text) return alert("Kuch paste karo bhai!");
+            const text = document.getElementById('text').value.trim();
+            if (!text) return alert("Text paste karo!");
 
-            const res = await fetch('/extract', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                body: new URLSearchParams({text})
-            });
-            const data = await res.json();
+            const btn = document.getElementById('btn');
+            const status = document.getElementById('status');
             
-            const container = document.getElementById('linksList');
-            container.innerHTML = '';
-            
-            if (data.links.length === 0) {
-                container.innerHTML = `<p class="text-red-400">Koi valid xhslink nahi mila 😢</p>`;
-            } else {
-                data.links.forEach(link => {
-                    const div = document.createElement('div');
-                    div.className = "flex items-center gap-3 bg-black p-4 rounded-xl";
-                    div.innerHTML = `
-                        <input type="checkbox" checked class="w-5 h-5 accent-red-500">
-                        <a href="${link}" target="_blank" class="text-blue-400 hover:underline flex-1 truncate">${link}</a>
-                    `;
-                    container.appendChild(div);
-                });
-                document.getElementById('linksSection').classList.remove('hidden');
-                window.allLinks = data.links.join(',');
-            }
-        });
-
-        async function downloadAll() {
-            const btn = event.target;
-            btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Downloading...`;
             btn.disabled = true;
+            btn.innerHTML = `Downloading... <span class="animate-pulse">⏳</span>`;
+            status.innerHTML = "Links extract ho rahe hain aur download shuru...";
 
-            const res = await fetch('/download', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                body: new URLSearchParams({links: window.allLinks})
-            });
+            try {
+                const res = await fetch('/download', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({ text })
+                });
 
-            if (res.ok) {
-                const blob = await res.blob();
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'rednote_videos.zip';
-                a.click();
-                URL.revokeObjectURL(url);
-            } else {
-                alert("Kuch error aaya, Railway logs check karo");
+                if (res.ok) {
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'rednote_videos.zip';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    status.innerHTML = `<span class="text-green-400">✅ Download complete!</span>`;
+                } else {
+                    const err = await res.json();
+                    status.innerHTML = `<span class="text-red-400">❌ ${err.error || 'Download failed'}</span>`;
+                }
+            } catch (err) {
+                status.innerHTML = `<span class="text-red-400">❌ Network error</span>`;
             }
 
-            btn.innerHTML = `<i class="fas fa-download"></i> Download All Videos as ZIP`;
             btn.disabled = false;
-        }
+            btn.innerHTML = 'Download All Videos';
+        });
     </script>
 </body>
 </html>

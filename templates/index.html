@@ -8,94 +8,106 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <style>
         body { font-family: system-ui, sans-serif; }
-        .glass { background: rgba(255,255,255,0.06); backdrop-filter: blur(16px); }
-        .neon { box-shadow: 0 0 20px rgba(239, 68, 68, 0.5); }
+        .glass { background: rgba(255,255,255,0.05); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
     </style>
 </head>
 <body class="bg-zinc-950 text-white min-h-screen">
-    <div class="max-w-4xl mx-auto p-6">
-        <div class="text-center mb-10">
-            <h1 class="text-5xl font-bold text-red-500 mb-2">RedNote Pro</h1>
-            <p class="text-zinc-400">No Watermark • Premium Quality • Fast Download</p>
-        </div>
+    <div class="max-w-4xl mx-auto p-8">
+        <h1 class="text-4xl font-bold text-center mb-2 text-red-500">RedNote Pro</h1>
+        <p class="text-center text-zinc-400 mb-10">Paste text → Extract links → Download with progress</p>
 
-        <div class="glass border border-red-500/30 rounded-3xl p-8">
-            <textarea id="inputText" rows="5" class="w-full bg-zinc-900 border border-zinc-700 rounded-2xl p-5 focus:border-red-500 outline-none text-lg" 
-                      placeholder="Yahan pura text ya multiple xhslink paste karo..."></textarea>
+        <div class="glass rounded-3xl p-8 mb-10">
+            <textarea id="text" rows="7" 
+                      class="w-full bg-zinc-900 border border-zinc-700 rounded-2xl p-6 focus:outline-none focus:border-red-500 text-lg"
+                      placeholder="Yahan pura text + xhslink links paste karo..."></textarea>
             
-            <button onclick="extractAndShow()" 
-                    class="mt-6 w-full py-5 bg-red-600 hover:bg-red-700 rounded-2xl font-bold text-xl flex items-center justify-center gap-3 transition">
-                <i class="fas fa-search"></i> EXTRACT & SHOW VIDEOS
+            <button onclick="extractLinks()" 
+                    class="mt-6 w-full bg-red-600 hover:bg-red-700 py-5 rounded-2xl font-bold text-xl flex items-center justify-center gap-3">
+                <i class="fas fa-magic"></i> EXTRACT LINKS
             </button>
         </div>
 
-        <div id="resultSection" class="hidden mt-10">
-            <h2 class="text-2xl font-semibold mb-6">Found Videos <span id="linkCount" class="text-red-500"></span></h2>
-            <div id="videoList" class="space-y-6"></div>
+        <!-- Videos List -->
+        <div id="resultSection" class="hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-semibold">Found Videos <span id="count" class="text-red-500"></span></h2>
+            </div>
+            
+            <div id="videoCards" class="space-y-6"></div>
 
+            <!-- All ZIP Button -->
             <button onclick="downloadAllZip()" 
-                    class="mt-10 w-full py-6 bg-gradient-to-r from-red-600 to-rose-600 rounded-3xl text-2xl font-bold flex items-center justify-center gap-3 hover:scale-105 transition">
+                    class="mt-12 w-full py-6 bg-gradient-to-r from-red-600 to-rose-600 rounded-3xl text-2xl font-bold flex items-center justify-center gap-4 hover:scale-[1.02] transition-all">
                 <i class="fas fa-file-archive"></i> DOWNLOAD ALL AS ZIP
             </button>
         </div>
+
+        <div id="globalStatus" class="mt-8 text-center text-sm"></div>
     </div>
 
     <script>
-        let currentLinks = [];
+        let allLinks = [];
 
-        async function extractAndShow() {
-            const text = document.getElementById('inputText').value.trim();
-            if (!text) return alert("Text paste karo!");
+        async function extractLinks() {
+            const text = document.getElementById('text').value.trim();
+            if (!text) return alert("Text paste karo bhai!");
 
-            // Simple frontend extract (backend pe bhi check rahega)
+            document.getElementById('globalStatus').innerHTML = `<span class="text-yellow-400">Extracting links...</span>`;
+
+            // Frontend pe links extract kar rahe hain (simple regex)
             const urlRegex = /https?:\/\/[^\s<>"]+/g;
-            currentLinks = [...text.matchAll(urlRegex)].map(m => m[0]).filter(u => u.includes('xhslink.com'));
-            currentLinks = [...new Set(currentLinks)];
+            allLinks = (text.match(urlRegex) || []).filter(url => url.includes('xhslink.com'));
+            allLinks = [...new Set(allLinks)];   // unique
 
-            if (currentLinks.length === 0) {
-                return alert("Koi valid xhslink nahi mila!");
+            if (allLinks.length === 0) {
+                document.getElementById('globalStatus').innerHTML = `<span class="text-red-400">Koi valid xhslink nahi mila</span>`;
+                return;
             }
 
-            renderVideos();
+            renderCards();
+            document.getElementById('resultSection').classList.remove('hidden');
+            document.getElementById('globalStatus').innerHTML = '';
         }
 
-        function renderVideos() {
-            const container = document.getElementById('videoList');
+        function renderCards() {
+            const container = document.getElementById('videoCards');
             container.innerHTML = '';
-            document.getElementById('resultSection').classList.remove('hidden');
-            document.getElementById('linkCount').textContent = `(${currentLinks.length})`;
+            document.getElementById('count').textContent = `(${allLinks.length})`;
 
-            currentLinks.forEach((link, i) => {
-                const div = document.createElement('div');
-                div.className = "glass border border-zinc-700 rounded-3xl p-6";
-                div.innerHTML = `
-                    <div class="flex gap-4">
-                        <div class="flex-1">
-                            <p class="text-red-400 text-sm">Video ${i+1}</p>
-                            <a href="${link}" target="_blank" class="block text-white break-all hover:text-red-300">${link}</a>
+            allLinks.forEach((link, index) => {
+                const cardHTML = `
+                    <div class="glass rounded-3xl p-6">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-1 min-w-0">
+                                <p class="text-red-400 text-sm mb-1">Video ${index + 1}</p>
+                                <a href="${link}" target="_blank" class="text-white hover:text-red-300 break-all text-[15px]">${link}</a>
+                            </div>
+                            <button onclick="downloadSingleVideo(${index}, this)" 
+                                    class="px-7 py-3 bg-red-600 hover:bg-red-700 rounded-2xl font-medium flex-shrink-0">
+                                Download MP4
+                            </button>
                         </div>
-                        <button onclick="startSingleDownload(${i}, this)" 
-                                class="px-8 py-3 bg-red-600 hover:bg-red-700 rounded-2xl font-medium whitespace-nowrap">
-                            Download MP4
-                        </button>
-                    </div>
-                    <div id="status-${i}" class="mt-5 text-sm"></div>
-                    <div class="h-2.5 bg-zinc-800 rounded-full mt-3 overflow-hidden">
-                        <div id="bar-${i}" class="h-2.5 bg-red-500 w-0 transition-all duration-300"></div>
+
+                        <div id="status-${index}" class="mt-5 text-sm min-h-[24px]"></div>
+                        <div class="h-2.5 bg-zinc-800 rounded-full mt-3 overflow-hidden">
+                            <div id="progress-${index}" class="h-2.5 bg-red-500 w-0 transition-all duration-300"></div>
+                        </div>
                     </div>
                 `;
-                container.appendChild(div);
+                container.innerHTML += cardHTML;
             });
         }
 
-        async function startSingleDownload(index, btn) {
-            const link = currentLinks[index];
-            const statusDiv = document.getElementById(`status-${index}`);
-            const progressBar = document.getElementById(`bar-${index}`);
+        async function downloadSingleVideo(index, button) {
+            const link = allLinks[index];
+            const statusEl = document.getElementById(`status-${index}`);
+            const progressEl = document.getElementById(`progress-${index}`);
 
-            btn.disabled = true;
-            btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Downloading...`;
-            statusDiv.innerHTML = `<span class="text-yellow-400">Starting download...</span>`;
+            button.disabled = true;
+            button.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Downloading...`;
+
+            statusEl.innerHTML = `<span class="text-yellow-400">Downloading... 0%</span>`;
+            progressEl.style.width = '0%';
 
             try {
                 const res = await fetch('/download_single', {
@@ -113,25 +125,57 @@
                     a.click();
                     URL.revokeObjectURL(url);
 
-                    statusDiv.innerHTML = `<span class="text-green-400 flex items-center gap-2"><i class="fas fa-check-circle"></i> Download Completed ✓</span>`;
-                    progressBar.style.width = '100%';
-                    progressBar.classList.add('!bg-green-500');
+                    // Complete
+                    statusEl.innerHTML = `<span class="text-green-400 flex items-center gap-2"><i class="fas fa-check-circle"></i> Completed ✓</span>`;
+                    progressEl.style.width = '100%';
+                    progressEl.classList.add('!bg-green-500');
                 } else {
-                    const err = await res.json();
-                    statusDiv.innerHTML = `<span class="text-red-400">Failed: ${err.error || 'Unknown error'}</span>`;
+                    const errData = await res.json().catch(() => ({}));
+                    statusEl.innerHTML = `<span class="text-red-400">Failed - ${errData.error || 'Unknown error'}</span>`;
                 }
-            } catch (e) {
-                statusDiv.innerHTML = `<span class="text-red-400">Network Error</span>`;
+            } catch (err) {
+                statusEl.innerHTML = `<span class="text-red-400">Network Error</span>`;
             }
 
-            btn.disabled = false;
-            btn.innerHTML = 'Download MP4';
+            button.disabled = false;
+            button.innerHTML = 'Download MP4';
         }
 
         async function downloadAllZip() {
-            const text = document.getElementById('inputText').value;
-            // ZIP ke liye simple alert for now (agar chaho to baad mein add kar sakte hain)
-            alert("ZIP download feature abhi under maintenance hai kyunki RedNote blocking kar raha hai.\n\nSingle video download try karo.");
+            const text = document.getElementById('text').value.trim();
+            const btn = event.currentTarget;
+            const originalText = btn.innerHTML;
+
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Preparing ZIP...`;
+
+            try {
+                const res = await fetch('/download', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({ text })
+                });
+
+                if (res.ok) {
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'rednote_videos.zip';
+                    a.click();
+                    URL.revokeObjectURL(url);
+
+                    document.getElementById('globalStatus').innerHTML = `<span class="text-green-400">✅ All videos downloaded as ZIP!</span>`;
+                } else {
+                    const err = await res.json().catch(() => ({}));
+                    alert("ZIP download failed: " + (err.error || "Unknown error"));
+                }
+            } catch (e) {
+                alert("Network error while downloading ZIP");
+            }
+
+            btn.disabled = false;
+            btn.innerHTML = originalText;
         }
     </script>
 </body>

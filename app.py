@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file, render_template_string
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 import yt_dlp
 import os
@@ -6,7 +6,7 @@ import uuid
 import threading
 import time
 import re
-import json
+import requests
 
 app = Flask(__name__)
 CORS(app)
@@ -14,7 +14,18 @@ CORS(app)
 DOWNLOAD_DIR = "/tmp/whimsy_downloads"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
-# Track job status in memory
+COOKIE_FILE = "/tmp/xhs_cookies.txt"
+
+def setup_cookies():
+    cookie_data = os.environ.get('XHS_COOKIES', '').strip()
+    if cookie_data:
+        with open(COOKIE_FILE, 'w') as f:
+            f.write(cookie_data)
+        return True
+    return False
+
+HAS_COOKIES = setup_cookies()
+
 jobs = {}
 
 def cleanup_file(path, delay=600):
@@ -27,15 +38,40 @@ def cleanup_file(path, delay=600):
             pass
     threading.Thread(target=_delete, daemon=True).start()
 
+def resolve_xhslink(url):
+    """
+    xhslink.com short URL ko manually follow karke
+    asli xiaohongshu.com URL nikalo — WeChat redirect ignore karo
+    """
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148',
+            'Accept': 'text/html,application/xhtml+xml',
+        }
+        # Sirf pehla redirect follow karo, WeChat pe mat jao
+        resp = requests.get(url, headers=headers, allow_redirects=False, timeout=10)
+        location = resp.headers.get('Location', '')
+
+        # Agar xiaohongshu.com pe redirect ho toh woh use karo
+        if 'xiaohongshu.com' in location:
+            return normalize_xhs_url(location)
+
+        # Agar WeChat pe redirect ho — manually item ID dhundho
+        if 'weixin' in location or 'wechat' in location:
+            # redirect_uri parameter mein xiaohongshu URL hota hai
+            m = re.search(r'redirect_uri=([^&]+)', location)
+            if m:
+                import urllib.parse
+                decoded = urllib.parse.unquote(m.group(1))
+                if 'xiaohongshu.com' in decoded:
+                    return normalize_xhs_url(decoded)
+
+        # Fallback: original URL return karo
+        return url
+    except Exception:
+        return url
+
 def normalize_xhs_url(url):
-    """
-    Convert any xiaohongshu/xhslink URL to the clean explore format
-    that yt-dlp supports: https://www.xiaohongshu.com/explore/<item_id>
-    """
-    # Extract item ID from various URL patterns:
-    # /discovery/item/<id>
-    # /explore/<id>
-    # /user/profile/<uid>/feeds/<id>
     patterns = [
         r'xiaohongshu\.com/discovery/item/([a-f0-9]+)',
         r'xiaohongshu\.com/explore/([a-f0-9]+)',
@@ -46,13 +82,8 @@ def normalize_xhs_url(url):
         if m:
             item_id = m.group(1)
             return f'https://www.xiaohongshu.com/explore/{item_id}'
-
-    # xhslink.com short URLs — return as-is, yt-dlp handles redirects
     if 'xhslink.com' in url:
-        # Strip query params from short links
         return url.split('?')[0]
-
-    # Fallback: strip query params and return
     return url.split('?')[0]
 
 def extract_links(text):
@@ -63,7 +94,12 @@ def extract_links(text):
         line = line.strip()
         m = pattern.match(line)
         if m:
-            url = normalize_xhs_url(m.group(1))
+            raw = m.group(1)
+            # xhslink URLs ko pehle resolve karo
+            if 'xhslink.com' in raw:
+                url = resolve_xhslink(raw)
+            else:
+                url = normalize_xhs_url(raw)
             if url not in clean:
                 clean.append(url)
     return clean
@@ -105,12 +141,14 @@ def download_worker(job_id, links, quality):
             },
         }
 
+        if HAS_COOKIES and os.path.exists(COOKIE_FILE):
+            ydl_opts['cookiefile'] = COOKIE_FILE
+
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=True)
                 title = info.get('title', f'video_{i+1}') if info else f'video_{i+1}'
 
-            # Find actual output file
             actual_path = output_path
             if not os.path.exists(actual_path):
                 for f in os.listdir(DOWNLOAD_DIR):
@@ -152,6 +190,10 @@ def download_worker(job_id, links, quality):
 def index():
     with open(os.path.join(os.path.dirname(__file__), 'static', 'index.html'), 'r') as f:
         return f.read()
+
+@app.route('/api/cookie-status', methods=['GET'])
+def api_cookie_status():
+    return jsonify({'has_cookies': HAS_COOKIES})
 
 @app.route('/api/extract', methods=['POST'])
 def api_extract():
@@ -197,7 +239,6 @@ def api_status(job_id):
 @app.route('/api/file/<file_id>', methods=['GET'])
 def api_file(file_id):
     filename = request.args.get('name', 'video.mp4')
-    # Security: only alphanumeric and hyphens in file_id
     if not re.match(r'^[a-f0-9\-]+$', file_id):
         return jsonify({'error': 'Invalid file id'}), 400
 

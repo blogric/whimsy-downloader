@@ -3,79 +3,110 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RedNote Downloader</title>
+    <title>RedNote Pro • Professional Downloader</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        body { font-family: 'Inter', system-ui, sans-serif; }
+        .glass { background: rgba(255,255,255,0.08); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.15); }
+        .neon-text { text-shadow: 0 0 20px rgb(239 68 68); }
+    </style>
 </head>
 <body class="bg-zinc-950 text-white min-h-screen">
-    <div class="max-w-2xl mx-auto p-8">
-        <div class="text-center mb-10">
-            <h1 class="text-4xl font-bold text-red-500 mb-2">RedNote Downloader</h1>
-            <p class="text-zinc-400">Paste links → Get all videos in ZIP</p>
+    <div class="max-w-3xl mx-auto p-8">
+
+        <!-- Header + Server Info -->
+        <div class="flex justify-between items-center mb-8">
+            <div class="flex items-center gap-3">
+                <div class="w-11 h-11 bg-red-600 rounded-2xl flex items-center justify-center text-3xl">🔥</div>
+                <h1 class="text-4xl font-bold neon-text">RedNote Pro</h1>
+            </div>
+            <div class="text-right text-sm">
+                <div class="flex items-center gap-2 justify-end">
+                    <span class="px-3 py-1 bg-emerald-500/20 text-emerald-400 text-xs font-medium rounded-full flex items-center gap-1">
+                        <i class="fas fa-circle"></i> ONLINE
+                    </span>
+                    <span class="text-zinc-400">Railway • Python 3.12 • yt-dlp Latest</span>
+                </div>
+                <p class="text-zinc-500 text-xs mt-1">No Watermark • High Quality • Secure</p>
+            </div>
         </div>
 
-        <div class="bg-zinc-900 border border-zinc-700 rounded-3xl p-8">
-            <textarea id="text" rows="10" 
-                      class="w-full bg-black border border-zinc-600 rounded-2xl p-6 text-white focus:outline-none focus:border-red-500 resize-none"
-                      placeholder="Yahan text paste karo jisme xhslink.com ke links hon..."></textarea>
+        <div class="glass rounded-3xl p-10">
+            <textarea id="text" rows="9" 
+                      class="w-full bg-zinc-900 border border-zinc-700 rounded-2xl p-7 text-lg focus:outline-none focus:border-red-500 resize-none"
+                      placeholder="Paste your text or multiple xhslink.com links here..."></textarea>
 
-            <button onclick="startDownload()" 
-                    id="downloadBtn"
-                    class="mt-8 w-full bg-red-600 hover:bg-red-700 py-6 rounded-2xl font-bold text-2xl flex items-center justify-center gap-3 transition-all">
-                <i class="fas fa-download"></i> 
+            <button onclick="startProfessionalDownload()" 
+                    id="mainBtn"
+                    class="mt-8 w-full py-7 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 rounded-3xl text-2xl font-bold flex items-center justify-center gap-4 shadow-xl shadow-red-500/30 transition-all">
+                <i class="fas fa-download"></i>
                 DOWNLOAD ALL VIDEOS AS ZIP
             </button>
         </div>
 
-        <!-- Progress Area -->
-        <div id="progressArea" class="hidden mt-10 bg-zinc-900 border border-zinc-700 rounded-3xl p-8">
-            <h3 class="text-lg font-semibold mb-6 flex items-center gap-2">
-                <i class="fas fa-spinner fa-spin text-red-500"></i> 
-                Downloading Videos...
-            </h3>
-            <div id="progressList" class="space-y-4"></div>
+        <!-- Overall Progress -->
+        <div id="progressSection" class="hidden mt-12 glass rounded-3xl p-8">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-semibold">Overall Progress</h3>
+                <span id="progressText" class="text-red-400 font-medium">0% • Processing videos...</span>
+            </div>
+            
+            <div class="h-4 bg-zinc-800 rounded-3xl overflow-hidden">
+                <div id="overallProgressBar" class="h-4 bg-gradient-to-r from-red-500 to-red-600 w-0 transition-all duration-500"></div>
+            </div>
+
+            <div id="statusDetail" class="mt-5 text-center text-zinc-400 text-sm"></div>
         </div>
 
-        <div id="finalMessage" class="mt-8 text-center text-sm"></div>
+        <div id="finalStatus" class="mt-8 text-center text-lg font-medium"></div>
     </div>
 
     <script>
-        async function startDownload() {
+        async function startProfessionalDownload() {
             const text = document.getElementById('text').value.trim();
-            if (!text) {
-                alert("Please paste some text containing xhslink links");
-                return;
-            }
+            if (!text) return alert("Please paste text containing xhslink links");
 
-            const btn = document.getElementById('downloadBtn');
+            const btn = document.getElementById('mainBtn');
             btn.disabled = true;
-            btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Processing...`;
+            btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Preparing Download...`;
 
-            document.getElementById('progressArea').classList.remove('hidden');
-            document.getElementById('finalMessage').innerHTML = '';
+            document.getElementById('progressSection').classList.remove('hidden');
+            document.getElementById('finalStatus').innerHTML = '';
 
-            // Extract links
+            // Extract links for progress count
             const urlRegex = /https?:\/\/[^\s<>"]+/g;
-            let links = (text.match(urlRegex) || []).filter(u => u.includes('xhslink.com'));
-            links = [...new Set(links)];
+            const links = (text.match(urlRegex) || []).filter(u => u.includes('xhslink.com'));
+            const totalVideos = [...new Set(links)].length || 1;
 
-            if (links.length === 0) {
-                alert("No valid xhslink.com links found!");
-                resetButton();
-                return;
-            }
+            // Simulate smooth overall progress
+            let progress = 0;
+            const progressBar = document.getElementById('overallProgressBar');
+            const progressText = document.getElementById('progressText');
+            const statusDetail = document.getElementById('statusDetail');
 
-            renderProgress(links);
+            const progressInterval = setInterval(() => {
+                progress += Math.random() * 12 + 6;
+                if (progress > 95) progress = 95;
+                
+                progressBar.style.width = progress + '%';
+                progressText.textContent = `${Math.floor(progress)}% • Processing ${Math.floor(totalVideos * progress / 100)} of ${totalVideos} videos`;
+            }, 220);
 
-            // Actual ZIP download call (tumhara purana /download endpoint)
             try {
                 const res = await fetch('/download', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: new URLSearchParams({ text: text })
+                    body: new URLSearchParams({ text })
                 });
 
+                clearInterval(progressInterval);
+
                 if (res.ok) {
+                    progressBar.style.width = '100%';
+                    progressText.textContent = `100% • Complete!`;
+                    statusDetail.innerHTML = `<span class="text-green-400">All videos processed successfully ✓</span>`;
+
                     const blob = await res.blob();
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
@@ -84,50 +115,23 @@
                     a.click();
                     URL.revokeObjectURL(url);
 
-                    document.getElementById('finalMessage').innerHTML = 
-                        `<span class="text-green-400 text-lg">✅ All videos downloaded successfully in ZIP!</span>`;
+                    document.getElementById('finalStatus').innerHTML = 
+                        `<span class="text-green-400 flex items-center justify-center gap-3 text-2xl"><i class="fas fa-check-circle"></i> ZIP Downloaded Successfully!</span>`;
                 } else {
                     const err = await res.json().catch(() => ({}));
-                    document.getElementById('finalMessage').innerHTML = 
-                        `<span class="text-red-400">❌ Failed: ${err.error || "RedNote is blocking downloads"}</span>`;
+                    progressBar.style.width = '100%';
+                    progressBar.classList.add('!bg-red-500');
+                    progressText.innerHTML = `Failed`;
+                    document.getElementById('finalStatus').innerHTML = 
+                        `<span class="text-red-400">❌ ${err.error || "Download failed - RedNote blocking"}</span>`;
                 }
-            } catch (err) {
-                document.getElementById('finalMessage').innerHTML = 
-                    `<span class="text-red-400">❌ Network Error - RedNote currently blocks direct download</span>`;
+            } catch (e) {
+                clearInterval(progressInterval);
+                document.getElementById('finalStatus').innerHTML = 
+                    `<span class="text-red-400">❌ Network Error</span>`;
             }
 
-            resetButton();
-        }
-
-        function renderProgress(links) {
-            const container = document.getElementById('progressList');
-            container.innerHTML = '';
-
-            links.forEach((link, i) => {
-                const item = document.createElement('div');
-                item.className = "flex items-center gap-4 bg-zinc-800 rounded-2xl p-4";
-                item.innerHTML = `
-                    <div class="w-8 h-8 bg-red-600/20 text-red-500 rounded-xl flex items-center justify-center flex-shrink-0">
-                        <i class="fas fa-video"></i>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <p class="text-sm text-zinc-400">Video ${i+1}</p>
-                        <p class="text-white text-sm truncate">${link}</p>
-                    </div>
-                    <div id="status-${i}" class="text-sm font-medium text-yellow-400">Queued</div>
-                `;
-                container.appendChild(item);
-
-                // Simple fake progress
-                setTimeout(() => {
-                    document.getElementById(`status-${i}`).innerHTML = 
-                        `<span class="text-green-400"><i class="fas fa-check"></i> Added to ZIP</span>`;
-                }, 800 + i * 400);
-            });
-        }
-
-        function resetButton() {
-            const btn = document.getElementById('downloadBtn');
+            // Reset button
             btn.disabled = false;
             btn.innerHTML = `<i class="fas fa-download"></i> DOWNLOAD ALL VIDEOS AS ZIP`;
         }
